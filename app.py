@@ -1,5 +1,5 @@
 import streamlit as st
-import anthropic
+import openai
 import os
 import re
 from pathlib import Path
@@ -148,15 +148,15 @@ st.markdown("""
 
 # ── Core logic ────────────────────────────────────────────────────────────────
 
-def get_client() -> anthropic.Anthropic | None:
+def get_client() -> openai.OpenAI | None:
     api_key = (
         st.session_state.get("api_key")
-        or st.secrets.get("ANTHROPIC_API_KEY", "")
-        or os.environ.get("ANTHROPIC_API_KEY", "")
+        or st.secrets.get("OPENAI_API_KEY", "")
+        or os.environ.get("OPENAI_API_KEY", "")
     )
     if not api_key:
         return None
-    return anthropic.Anthropic(api_key=api_key)
+    return openai.OpenAI(api_key=api_key)
 
 
 def chunk_text(text: str, chunk_size: int = 600, overlap: int = 2) -> list[str]:
@@ -195,7 +195,7 @@ def find_relevant_chunks(
     return [(n, c, s) for n, c, s in results[:top_k] if s >= MIN_RELEVANCE_SCORE]
 
 
-def get_ai_response(client: anthropic.Anthropic, query: str, chunks: list) -> str:
+def get_ai_response(client: openai.OpenAI, query: str, chunks: list) -> str:
     if not chunks:
         return (
             "I wasn't able to find relevant information in our help articles for that question. "
@@ -215,18 +215,15 @@ def get_ai_response(client: anthropic.Anthropic, query: str, chunks: list) -> st
         "Never make up information or draw on outside knowledge."
     )
 
-    prompt = f"""HELP ARTICLE EXCERPTS:
-{context}
-
-USER QUESTION: {query}"""
-
-    response = client.messages.create(
-        model="claude-opus-4-6",
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": f"HELP ARTICLE EXCERPTS:\n{context}\n\nUSER QUESTION: {query}"},
+        ],
         max_tokens=1024,
-        system=system,
-        messages=[{"role": "user", "content": prompt}],
     )
-    return response.content[0].text
+    return response.choices[0].message.content
 
 
 def load_sample_articles() -> dict[str, str]:
@@ -245,7 +242,7 @@ if "docs" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "api_key" not in st.session_state:
-    st.session_state.api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    st.session_state.api_key = os.environ.get("OPENAI_API_KEY", "")
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
@@ -253,7 +250,7 @@ with st.sidebar:
     st.title("⚙️ Settings")
 
     if not st.session_state.api_key:
-        entered = st.text_input("Anthropic API Key", type="password", key="key_input")
+        entered = st.text_input("OpenAI API Key", type="password", key="key_input")
         if entered:
             st.session_state.api_key = entered
             st.rerun()
@@ -303,7 +300,7 @@ with st.sidebar:
 client = get_client()
 
 if not client:
-    st.warning("⚠️ Enter your Anthropic API key in the sidebar to get started.")
+    st.warning("⚠️ Enter your OpenAI API key in the sidebar to get started.")
     st.stop()
 
 if not st.session_state.docs:
