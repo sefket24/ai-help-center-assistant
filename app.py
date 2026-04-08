@@ -17,7 +17,8 @@ MIN_RELEVANCE_SCORE = 0.15
 def get_client() -> anthropic.Anthropic | None:
     api_key = (
         st.session_state.get("api_key")
-        or os.environ.get("ANTHROPIC_API_KEY")
+        or st.secrets.get("ANTHROPIC_API_KEY", "")
+        or os.environ.get("ANTHROPIC_API_KEY", "")
     )
     if not api_key:
         return None
